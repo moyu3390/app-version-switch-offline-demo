@@ -1,0 +1,23 @@
+一个模拟应用发布时，业务不停，两个版本平滑过渡的例子。
+
+1、APPController是测试业务入口：包括两个方式的应用平滑下线实现
+	① 应用发布存在另一版本时，新发布的应用信息存入临时容器的方式。
+	② 应用发布存在另一版本时，旧版本的应用信息复制到临时容器的方式。
+	③ 方法：publishApp 和 executeOrder 是①方式的测试使用。（publishApp是发布应用的方法，executeOrder是模拟应用业务调用的方法）
+	③ 方法：publishApp2 和 executeOrder2 是②方式的测试使用。（publishApp2是发布应用的方法，executeOrder2是模拟应用业务调用的方法）
+2、AppService 和AppService2 是两种方式的发布应用时的逻辑处理
+	同一应用，同时只能发布一次，以应用的下线线程处理是否结束为条件。
+	类中维护了一个map，记录应用和对应的平滑下线线程的处理结果，用来检测应用的下线线程是否处理结束。
+	
+3、ProcessorManager 是①方式的业务的管理类，提供获取应用业务，加载应用下的业务class，应用下线，应用信息移动等方法。
+
+4、AppProcessorManager 是②方式的业务的管理类，提供获取应用业务，加载应用下的业务class，应用下线，应用信息移动等方法。
+
+6、AppClassLoader 是自定义classLoader，主要覆写了findClass和loadClass方法
+
+7、ClassScanner 工具类，用来扫描class文件，获取事务包下的所有业务class
+
+8、AppOfflineRunnable 是①方式的应用平滑下线处理线程对象。
+   AppOfflineRunnable 是②方式的应用平滑下线处理线程对象。
+9、AppThreadCaller 是线程的调用类，维护下线线程的线程池。目前池内只会有一个活跃线程，多余的任务放置队列中。以后可以适当的调整线程数，暂时没有必要。
+
