@@ -100,18 +100,28 @@ public class AppProcessorManager {
      */
     public static void offlineApp(String appId) {
         AppInfo appInfo = appProcessorTempMap.get(appId);
-        appInfo.isOffline = true;
-//        if (Objects.nonNull(appInfo)) {
-//            Boolean isOffline = appInfo.getIsOffline();
-//            if (!isOffline) {
-//                synchronized (lock) {
-//                    isOffline = appInfo.getIsOffline();
-//                    if (!isOffline) {
-//                        appInfo.isOffline = true;
-//                    }
-//                }
-//            }
-//        }
+        if (Objects.nonNull(appInfo)) {
+            Boolean isOffline = appInfo.getIsOffline();
+            if (!isOffline) {
+                synchronized (lock) {
+                    isOffline = appInfo.getIsOffline();
+                    if (!isOffline) {
+                        appInfo.isOffline = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 从正式容器中移除指定的应用信息 --采用旧版本应用放到临时容器的方式
+     *
+     * @param appId
+     * @return
+     */
+    public static boolean removeAppFromTempMap(String appId) {
+        AppInfo remove = appProcessorTempMap.remove(appId);
+        return true;
     }
 
     /**
@@ -127,32 +137,12 @@ public class AppProcessorManager {
     /**
      * 从正式容器中移除指定的应用信息 --采用旧版本应用放到临时容器的方式
      *
-     * @param appId
-     * @return
-     */
-    public static boolean removeAppFromTempMap(String appId) {
-        AppInfo remove = appProcessorTempMap.remove(appId);
-        return true;
-    }
-
-    /**
-     * 从正式容器中移除指定的应用信息 --采用旧版本应用放到临时容器的方式
-     *
      * @param appInfo
      * @return
      */
-    public static boolean addApp(AppInfo appInfo) {
-        appProcessorMap.put(appInfo.getAppId(), appInfo);
-
-//        AppInfo temp = getAppInfo(appInfo.getAppId());
-//        if (Objects.isNull(temp)) {
-//            synchronized (lock) {
-//                temp = getAppInfo(appInfo.getAppId());
-//                if (Objects.isNull(temp)) {
-//                    appProcessorMap.put(appInfo.getAppId(), appInfo);
-//                }
-//            }
-//        }
+    public static boolean setAppInfoIfAbsent(AppInfo appInfo) {
+        // map中不存在才能put成功,并发时，只会有一个线程put成功，返回值为null
+        appProcessorMap.putIfAbsent(appInfo.getAppId(), appInfo);
         return true;
     }
 
@@ -181,9 +171,6 @@ public class AppProcessorManager {
                 Class<?> loadClass = classLoader.loadClass(cls);
                 Object o = loadClass.newInstance();
                 System.err.println(o);
-//                Method processor = loadClass.getMethod("processor", String.class);
-//                Object invoke = processor.invoke(o, appId);
-//                System.err.println(invoke);
                 Object processId = loadClass.getMethod("getProcessId").invoke(o);
 
                 Map<String, Object> tempMap = appInfo.getProcessors();

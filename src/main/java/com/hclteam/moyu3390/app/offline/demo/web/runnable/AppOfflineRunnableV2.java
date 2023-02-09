@@ -42,6 +42,7 @@ public class AppOfflineRunnableV2 implements Runnable {
                 System.err.println(Thread.currentThread().getName() + " 临时容器中已不存在应用：" + appId);
                 return;
             }
+            WeakReference<AppInfo> appInfoWeakReference = new WeakReference<>(appInfo);
             // 检查是否为下线状态
             Boolean isOffline = appInfo.isOffline;
             System.err.println(Thread.currentThread().getName() + " 临时容器中应用在线状态 isOffline：" + isOffline);
@@ -51,31 +52,23 @@ public class AppOfflineRunnableV2 implements Runnable {
                 AppProcessorManager.removeAppFromTempMap(appId);
                 // 获取classloader
                 URLClassLoader classLoader = (URLClassLoader) appInfo.getClass().getClassLoader();
-
-                while (true) {
-                    try {
-                        classLoader.close();
-                    } catch (IOException e) {
-                    }
-                    classLoader = null;
-                    // 卸载classloader
-                    WeakReference<ClassLoader> classLoaderWeakReference = new WeakReference<>(classLoader);
-
-                    // 置位弱引用,等下一次垃圾回收
+                WeakReference<URLClassLoader> classLoaderWeakReference = new WeakReference<>(classLoader);
+                try {
+                    classLoader.close();
+                } catch (IOException e) {
+                } finally {
                     appInfo = null;
-                    WeakReference<AppInfo> appInfoWeakReference = new WeakReference<>(appInfo);
-
+                    classLoader = null;
+                    appInfoWeakReference.clear();
+                    classLoaderWeakReference.clear();
+                    // 卸载classloader
+                    // 置为弱引用,等下一次垃圾回收
                     if (appInfoWeakReference.get() == null && classLoaderWeakReference.get() == null) {
                         System.err.println(Thread.currentThread().getName() + " appinfo和classloader 被回收");
-                        break;
                     }
-                    try {
-                        System.err.println(Thread.currentThread().getName() + " 检测是否被回收");
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                    }
+                    appInfoWeakReference = null;
+                    classLoaderWeakReference = null;
                 }
-
             }
         }
     }

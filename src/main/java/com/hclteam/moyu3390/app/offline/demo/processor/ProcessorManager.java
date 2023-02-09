@@ -45,7 +45,7 @@ public class ProcessorManager {
         if (Objects.isNull(appInfo) || appInfo.isOffline) {
             // 下线状态 从临时容器中查找应用信息
             appInfo = appProcessorTempMap.get(appId);
-            if (Objects.isNull(appInfo)) {
+            if (Objects.isNull(appInfo) || appInfo.isOffline) {
                 return null;
             }
         }
@@ -74,7 +74,7 @@ public class ProcessorManager {
     }
 
     public static boolean setAppInfoIfAbsent(AppInfo appInfo) {
-        // map中不存在才能put成功
+        // map中不存在才能put成功,并发时，只会有一个线程put成功，返回值为null
         AppInfo appInfo1 = appProcessorMap.putIfAbsent(appInfo.getAppId(), appInfo);
         return Objects.isNull(appInfo1);
     }
@@ -102,7 +102,7 @@ public class ProcessorManager {
     }
 
     public static boolean setApp2TempMap(AppInfo appInfo) {
-        appProcessorTempMap.put(appInfo.getAppId(),appInfo);
+        appProcessorTempMap.put(appInfo.getAppId(), appInfo);
         return true;
     }
 
@@ -112,7 +112,7 @@ public class ProcessorManager {
      * @param appId
      * @return
      */
-    public static boolean unifyAppInfo(String appId) {
+    public static boolean replaceAppInfo(String appId) {
         // 从临时容器中查找到对象，并set到正式容器中
         AppInfo appInfo = appProcessorTempMap.get(appId);
         if (Objects.nonNull(appInfo)) {
@@ -124,12 +124,11 @@ public class ProcessorManager {
     }
 
     public static boolean removeTempMapApp(String appId) {
-        // 从临时容器中查找到对象，并set到正式容器中
         AppInfo appInfo = appProcessorTempMap.get(appId);
-        if(Objects.nonNull(appInfo)) {
+        if (Objects.nonNull(appInfo)) {
             synchronized (lock) {
                 appInfo = appProcessorTempMap.get(appId);
-                if(Objects.nonNull(appInfo)) {
+                if (Objects.nonNull(appInfo)) {
                     appProcessorTempMap.remove(appId);
                 }
             }
@@ -144,18 +143,70 @@ public class ProcessorManager {
      */
     public static void offlineApp(String appId) {
         AppInfo appInfo = getAppInfo(appId);
-        appInfo.isOffline = true;
-//        if (Objects.nonNull(appInfo)) {
-//            Boolean isOffline = appInfo.getIsOffline();
-//            if (!isOffline) {
-//                synchronized (lock) {
-//                    isOffline = appInfo.getIsOffline();
-//                    if (!isOffline) {
-//                        appInfo.isOffline = true;
-//                    }
-//                }
-//            }
-//        }
+        if (Objects.nonNull(appInfo)) {
+            Boolean isOffline = appInfo.getIsOffline();
+            if (!isOffline) {
+                synchronized (lock) {
+                    isOffline = appInfo.getIsOffline();
+                    if (!isOffline) {
+                        appInfo.isOffline = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 加载指定目录下的processor --采用新版本应用放到临时容器的方式
+     * 应用发布时加载
+     *
+     * @param appId      应用标识
+     * @param classDir   class文件所在目录
+     * @param packageDir processor的包名
+     */
+    public static AppInfo loadProcessor(String appId, String classDir, String packageDir, String version) {
+        String appClassDir = classDir + File.separator + appId + File.separator + version + File.separator + "classes";
+        if (appId.contains(".")) {
+            appId = appId.substring(0, appId.lastIndexOf("."));
+        }
+        AppClassLoader classLoader = new AppClassLoader(new String[]{appClassDir});
+        List<String> classes = ClassScanner.searchClasses(appClassDir, packageDir);
+        AppInfo appInfo = new AppInfo();
+        appInfo.setAppId(appId);
+        Map<String, Object> processorMap = new ConcurrentHashMap<>();
+        appInfo.setProcessors(processorMap);
+        for (String cls : classes) {
+            try {
+                Class<?> loadClass = classLoader.loadClass(cls);
+                Object o = loadClass.newInstance();
+                System.err.println(o);
+                Object processId = loadClass.getMethod("getProcessId").invoke(o);
+                Map<String, Object> tempMap = appInfo.getProcessors();
+                tempMap.put(processId.toString(), o);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return appInfo;
+    }
+
+
+    public static void main(String[] args) {
+        String jarName = "app-mock-1.0.0.0.jar";
+//        loadProcessor("demo",jarName);
+        String dir = "D:\\test\\lib\\testapp\\classes";
+        String packagePath = "cn.com.infosec.mock.app.processor";
+        AppClassLoader classLoader = new AppClassLoader(new String[]{dir});
+        List<String> classes = ClassScanner.searchClasses(dir, packagePath);
+        for (String cls : classes) {
+            try {
+                Class<?> aClass = classLoader.loadClass(cls);
+                Object o = aClass.newInstance();
+                System.err.println(o);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
 
@@ -230,110 +281,5 @@ public class ProcessorManager {
         }
     }
 
-    /**
-     * 加载指定目录下的processor --采用新版本应用放到临时容器的方式
-     * 系统启动时加载
-     *
-     * @param appId      应用标识
-     * @param classDir   class文件所在目录
-     * @param packageDir processor的包名
-     */
-    public static void loadProcessor(String appId, String classDir, String packageDir, String version) {
-        Map<String, AppInfo> map = appProcessorMap;
-//        if (isExists) {
-//            map = appProcessorTempMap;
-//        }
-        String appClassDir = classDir + File.separator + appId + File.separator + version + File.separator + "classes";
-        if (appId.contains(".")) {
-            appId = appId.substring(0, appId.lastIndexOf("."));
-        }
-        AppClassLoader classLoader = new AppClassLoader(new String[]{appClassDir});
-        List<String> classes = ClassScanner.searchClasses(appClassDir, packageDir);
-        for (String cls : classes) {
-            try {
-                Class<?> loadClass = classLoader.loadClass(cls);
-                Object o = loadClass.newInstance();
-                System.err.println(o);
-//                Method processor = loadClass.getMethod("processor", String.class);
-//                Object invoke = processor.invoke(o, appId);
-//                System.err.println(invoke);
-                Object processId = loadClass.getMethod("getProcessId").invoke(o);
-                AppInfo appInfo = map.get(appId);
-                Map<String, Object> processorMap = null;
-                if (Objects.isNull(appInfo)) {
-                    appInfo = new AppInfo();
-                    appInfo.setAppId(appId);
-                    processorMap = new ConcurrentHashMap<>();
-                } else {
-                    processorMap = appInfo.getProcessors();
-                }
-//                Map<String, Object> processorMap = appProcessorMap.get(appId);
-                if (Objects.isNull(processorMap)) {
-                    processorMap = new ConcurrentHashMap<>();
-                }
-                appInfo.setProcessors(processorMap);
-                processorMap.put(processId.toString(), o);
-                map.put(appId, appInfo);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    /**
-     * 加载指定目录下的processor --采用新版本应用放到临时容器的方式
-     * 应用发布时加载
-     *
-     * @param appId      应用标识
-     * @param classDir   class文件所在目录
-     * @param packageDir processor的包名
-     */
-    public static AppInfo loadVersionProcessor(String appId, String classDir, String packageDir, String version) {
-        String appClassDir = classDir + File.separator + appId + File.separator + version + File.separator + "classes";
-        if (appId.contains(".")) {
-            appId = appId.substring(0, appId.lastIndexOf("."));
-        }
-        AppClassLoader classLoader = new AppClassLoader(new String[]{appClassDir});
-        List<String> classes = ClassScanner.searchClasses(appClassDir, packageDir);
-        AppInfo appInfo = new AppInfo();
-        appInfo.setAppId(appId);
-        Map<String, Object> processorMap = new ConcurrentHashMap<>();
-        appInfo.setProcessors(processorMap);
-        for (String cls : classes) {
-            try {
-                Class<?> loadClass = classLoader.loadClass(cls);
-                Object o = loadClass.newInstance();
-                System.err.println(o);
-//                Method processor = loadClass.getMethod("processor", String.class);
-//                Object invoke = processor.invoke(o, appId);
-//                System.err.println(invoke);
-                Object processId = loadClass.getMethod("getProcessId").invoke(o);
-                Map<String, Object> tempMap = appInfo.getProcessors();
-                tempMap.put(processId.toString(), o);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return appInfo;
-    }
-
-
-    public static void main(String[] args) {
-        String jarName = "app-mock-1.0.0.0.jar";
-//        loadProcessor("demo",jarName);
-        String dir = "D:\\test\\lib\\testapp\\classes";
-        String packagePath = "cn.com.infosec.mock.app.processor";
-        AppClassLoader classLoader = new AppClassLoader(new String[]{dir});
-        List<String> classes = ClassScanner.searchClasses(dir, packagePath);
-        for (String cls : classes) {
-            try {
-                Class<?> aClass = classLoader.loadClass(cls);
-                Object o = aClass.newInstance();
-                System.err.println(o);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
 
 }

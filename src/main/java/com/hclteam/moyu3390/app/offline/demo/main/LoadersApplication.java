@@ -28,10 +28,12 @@ public class LoadersApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // 加载应用事务
-        ProcessorManager.loadProcessor("testapp", ProcessorManager.jarDir, ProcessorManager.packagePath, "v1");
+        // 加载应用事务 方式①
+        AppInfo appInfo1 = ProcessorManager.loadProcessor("testapp", ProcessorManager.jarDir, ProcessorManager.packagePath, "v1");
+        ProcessorManager.setAppInfoIfAbsent(appInfo1);
+        // 加载应用事务 方式②
         AppInfo appInfo = AppProcessorManager.loadProcessor("testapp", ProcessorManager.jarDir, ProcessorManager.packagePath, "v1");
-        AppProcessorManager.addApp(appInfo);
+        AppProcessorManager.setAppInfoIfAbsent(appInfo);
 
 
     }

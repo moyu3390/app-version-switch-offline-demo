@@ -17,12 +17,6 @@ public class AppThreadCaller {
             new LinkedBlockingQueue<>(200), Executors.defaultThreadFactory(), new ThreadPoolExecutor.CallerRunsPolicy());
 
 
-    public static void call(Runnable runnable) {
-        executor.execute(runnable);
-        printThreadPoolStatus(executor);
-    }
-
-
     public static <T> Future<T> call(Runnable runnable,T result) {
         Future<T> submit = executor.submit(runnable, result);
         printThreadPoolStatus(executor);
