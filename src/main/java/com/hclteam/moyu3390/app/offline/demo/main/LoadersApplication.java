@@ -17,7 +17,6 @@ public class LoadersApplication implements CommandLineRunner {
     @Autowired
     ApplicationContext applicationContext;
 
-
     public static void main(String[] args) {
         SpringApplication.run(LoadersApplication.class, args);
         ApplicationHome home = new ApplicationHome();

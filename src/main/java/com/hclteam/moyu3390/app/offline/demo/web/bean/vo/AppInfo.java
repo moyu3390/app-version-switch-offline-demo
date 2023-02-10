@@ -10,12 +10,14 @@ package com.hclteam.moyu3390.app.offline.demo.web.bean.vo;
 
 import lombok.Data;
 import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.Serializable;
 import java.util.Map;
 
 @Data
 @ToString
+@Slf4j
 public class AppInfo implements Serializable {
     private String appId;
 
@@ -28,6 +30,6 @@ public class AppInfo implements Serializable {
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
-        System.err.println("appinfo对象被回收了," + this.toString());
+        log.info("appinfo对象被回收了," + this.toString());
     }
 }

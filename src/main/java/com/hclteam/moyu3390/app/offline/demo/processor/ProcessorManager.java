@@ -10,17 +10,14 @@ package com.hclteam.moyu3390.app.offline.demo.processor;
 
 import com.hclteam.moyu3390.app.offline.demo.loaders.AppClassLoader;
 import com.hclteam.moyu3390.app.offline.demo.loaders.ClassScanner;
-import com.hclteam.moyu3390.app.offline.demo.loaders.JarClassLoader;
 import com.hclteam.moyu3390.app.offline.demo.web.bean.vo.AppInfo;
 import org.springframework.util.CollectionUtils;
 
 import java.io.File;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.jar.JarFile;
 
 public class ProcessorManager {
     private static volatile Map<String, AppInfo> appProcessorMap = new ConcurrentHashMap<>();
@@ -102,7 +99,7 @@ public class ProcessorManager {
     }
 
     public static boolean setApp2TempMap(AppInfo appInfo) {
-        appProcessorTempMap.put(appInfo.getAppId(), appInfo);
+        appProcessorTempMap.put(appInfo.getAppId(),appInfo);
         return true;
     }
 
@@ -125,10 +122,10 @@ public class ProcessorManager {
 
     public static boolean removeTempMapApp(String appId) {
         AppInfo appInfo = appProcessorTempMap.get(appId);
-        if (Objects.nonNull(appInfo)) {
+        if(Objects.nonNull(appInfo)) {
             synchronized (lock) {
                 appInfo = appProcessorTempMap.get(appId);
-                if (Objects.nonNull(appInfo)) {
+                if(Objects.nonNull(appInfo)) {
                     appProcessorTempMap.remove(appId);
                 }
             }
@@ -208,78 +205,5 @@ public class ProcessorManager {
             }
         }
     }
-
-
-    // 加载指定jar包下的processor
-    public static void loadProcessor(String appId, String jarName) {
-
-        String jarUrl1 = jarDir + File.separator + jarName;
-
-        String jar2Name = "app-mock-1.0.0.1.jar";
-        String jarUrl2 = jarDir + File.separator + jar2Name;
-
-        long start = System.currentTimeMillis();
-        // 扫描jar包下的类
-        try {
-            JarFile jarFile = new JarFile(new File(jarUrl1));
-            List<String> processorSet = ClassScanner.getJarClasses(jarFile, "cn.com.infosec.mock.app.processor");
-
-            JarClassLoader jarLoader = new JarClassLoader(new String[]{jarUrl1});
-            Class<?> loadClass = jarLoader.loadClass(processorSet.get(0));
-            Object o = loadClass.newInstance();
-            System.err.println(o.toString());
-            Method processor = loadClass.getMethod("processor");
-            Object invoke = processor.invoke(o);
-            System.err.println(invoke);
-            Object processId = loadClass.getMethod("getProcessId").invoke(o);
-            AppInfo appInfo = getAppInfo(appId);
-            Map<String, Object> processorMap = null;
-            if (Objects.isNull(appInfo)) {
-                appInfo = new AppInfo();
-                appInfo.setAppId(appId);
-                processorMap = new ConcurrentHashMap<>();
-            } else {
-                processorMap = appInfo.getProcessors();
-            }
-            if (Objects.isNull(processorMap)) {
-                processorMap = new ConcurrentHashMap<>();
-            }
-            appInfo.setProcessors(processorMap);
-            processorMap.put(processId.toString(), o);
-            appProcessorMap.put(appId, appInfo);
-
-
-            JarFile jar2File = new JarFile(new File(jarUrl2));
-            List<String> processorSet2 = ClassScanner.getJarClasses(jar2File, "cn.com.infosec.mock.app.processor");
-
-
-            JarClassLoader jarLoader2 = new JarClassLoader(new String[]{jarUrl2});
-            Class<?> loadClass2 = jarLoader2.loadClass(processorSet2.get(0));
-            Object o2 = loadClass2.newInstance();
-            System.err.println(o2.toString());
-            Method processor2 = loadClass2.getMethod("processor");
-            Object invoke2 = processor2.invoke(o2);
-            System.err.println(invoke2);
-            Object processId2 = loadClass2.getMethod("getProcessId").invoke(o2);
-            Map<String, Object> processorTempMap = new ConcurrentHashMap<>();
-            processorTempMap.put(processId2.toString(), o2);
-            Map<String, Object> appProcessorTempMap = new ConcurrentHashMap<>();
-            appProcessorTempMap.put(appId, processorTempMap);
-
-//            JarClassLoaderSwapper classLoaderSwapper = JarClassLoaderSwapper.newCurrentThreadClassLoaderSwapper();
-//            classLoaderSwapper.setCurrentThreadClassLoader(jarLoader);
-//            Class<?> aClass = Thread.currentThread().getContextClassLoader().loadClass("cn.com.infosec.netsign.Application");
-//            classLoaderSwapper.restoreCurrentThreadClassLoader();
-//            Object o = aClass.newInstance();
-
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        } catch (InstantiationException e) {
-            throw new RuntimeException(e);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
 
 }

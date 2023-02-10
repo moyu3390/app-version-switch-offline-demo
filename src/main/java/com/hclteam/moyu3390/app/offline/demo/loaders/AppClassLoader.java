@@ -13,6 +13,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -79,21 +80,25 @@ public class AppClassLoader extends URLClassLoader {
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         Class<?> aClass = findClass(name);
-        if(Objects.nonNull(aClass)) {
+        if (Objects.nonNull(aClass)) {
             return aClass;
         }
         return super.loadClass(name);
     }
 
     @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
-        System.err.println("classloader对象被回收了,");
+    public void close() throws IOException {
+        super.close();
     }
 
     @Override
-    public void close() throws IOException {
-        super.close();
+    protected void finalize() throws Throwable {
+        super.finalize();
+        System.err.println(this.getClass().getName() + "被回收");
+        Class<?>[] classes = this.getClass().getClasses();
+        Arrays.stream(classes).forEach(c -> {
+            System.err.println(this.getClass().getName() + "加载的类：" + c.getName());
+        });
     }
 
     private byte[] getClassBytes(File classfile) {

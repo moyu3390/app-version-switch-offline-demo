@@ -8,8 +8,11 @@
 
 package com.hclteam.moyu3390.app.offline.demo.web.runnable;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.concurrent.*;
 
+@Slf4j
 public class AppThreadCaller {
 
     //数据处理时需要强关联数据时间顺序时，换一种拒绝策略。CallerRunsPolicy不适合时间顺序要求比较严格的场景
@@ -17,7 +20,7 @@ public class AppThreadCaller {
             new LinkedBlockingQueue<>(200), Executors.defaultThreadFactory(), new ThreadPoolExecutor.CallerRunsPolicy());
 
 
-    public static <T> Future<T> call(Runnable runnable,T result) {
+    public static <T> Future<T> call(Runnable runnable, T result) {
         Future<T> submit = executor.submit(runnable, result);
         printThreadPoolStatus(executor);
         return submit;
@@ -26,8 +29,7 @@ public class AppThreadCaller {
 
     private static void printThreadPoolStatus(ThreadPoolExecutor executor) {
         BlockingQueue queue = executor.getQueue();
-        System.out.println(Thread.currentThread().getName() + "," +
-
+        log.info(Thread.currentThread().getName() + "," +
                 "当前的线程数量:" + executor.getPoolSize() + "," +
                 "核心线程数:" + executor.getCorePoolSize() + "," +
                 "最大线程数:" + executor.getMaximumPoolSize() + "," +

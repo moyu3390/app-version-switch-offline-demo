@@ -59,33 +59,28 @@ public class AppService {
     public Object publishApp(String appId, String version) {
         // 检查是否有同名应用在提供服务
         Boolean isRunning = ProcessorManager.isRunning(appId);
-        System.err.println("新应用的发布任务，" + appId + "---" + version);
+        System.err.println(AppService.class.getSimpleName() + "=====新应用的发布任务，" + appId + "---" + version);
+
         // 如果应用已存在，说明有旧版本正在运行
         // 加载新应用的porcessor,如果不存在，加载到正式容器中，如果存在，加载到临时容器中。此时，旧应用还在提供服务
-        AppInfo appInfo = ProcessorManager.loadProcessor(appId, ProcessorManager.jarDir, ProcessorManager.packagePath, version);
         if (isRunning) {
             // 如果后期并发量高，此处可以做成doubble check 方式来获取应用的返回结果信息
             Future<Boolean> future = appResultMap.get(appId);
             // 如果当前应用的处理线程不存在或已经处理结束(不关心处理成功还是失败)，则可以重新发布应用，否则不发布
             if (Objects.isNull(future) || future.isDone()) {
-                // 把应用放入临时容器
-                ProcessorManager.setApp2TempMap(appInfo);
-                //  等待新应用加载完毕后，为旧应用停止提供processor服务，切换为新应用的processor实例
-                //  修改旧应用的运行状态为false，在获取processor的方法中改造。获取临时容器中应用的processor
-                // 旧应用下线
-                ProcessorManager.offlineApp(appId);
-                //  旧应用存活时间开始倒计时（2分钟），激活清理classloader线程
+                //  旧应用存活时间开始倒计时（2分钟），激活下线线程
                 //  开启线程计时
-                AppOfflineRunnable task = new AppOfflineRunnable(1 * 10 * 1000, appId);
+                AppOfflineRunnable task = new AppOfflineRunnable(1 * 10 * 1000, appId, version);
                 // 清理线程等待倒计时结束，开始卸载旧应用的classloader和已加载的实例信息
                 // 把新应用暂存的信息 保存到应用信息容器中  完成旧应用的替换
                 Future<Boolean> booleanFuture = AppThreadCaller.call(task, Boolean.TRUE);
                 appResultMap.put(appId, booleanFuture);
             } else {
-                System.err.println("当前系统已存在该应用的发布任务，请稍后继续发布..." + appId);
+                System.err.println(AppService.class.getSimpleName() + "=====当前系统已存在该应用的发布任务，请稍后继续发布..." + appId);
             }
             return Boolean.TRUE;
         }
+        AppInfo appInfo = ProcessorManager.loadProcessor(appId, ProcessorManager.jarDir, ProcessorManager.packagePath, version);
         boolean b = ProcessorManager.setAppInfoIfAbsent(appInfo);
 
         return Boolean.TRUE;

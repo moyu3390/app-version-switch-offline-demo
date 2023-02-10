@@ -23,36 +23,46 @@ public class AppOfflineRunnable implements Runnable {
     // 延迟执行时间:单位（毫秒）
     private long delayTimeMillis;
     private String appId;
+    private String version;
 
 
-    public AppOfflineRunnable(long delayTime, String appId) {
+    public AppOfflineRunnable(long delayTime, String appId, String _version) {
         this.delayTimeMillis = delayTime;
         this.appId = appId;
+        this.version = _version;
     }
 
     @Override
-    public void run() {
-
+    public synchronized void run() {
+        AppInfo appInfo = ProcessorManager.loadProcessor(appId, ProcessorManager.jarDir, ProcessorManager.packagePath, version);
+        // 把应用放入临时容器
+        ProcessorManager.setApp2TempMap(appInfo);
+        /**  等待新应用加载完毕后，为旧应用停止提供processor服务，切换为新应用的processor实例
+         修改旧应用的下线状态为true，在获取processor的方法中改造。获取临时容器中应用的processor */
+        // 旧应用下线
+        ProcessorManager.offlineApp(appId);
         // 先延迟等待
         sleep();
         // 线程没有中断才执行逻辑代码
-        System.err.println(Thread.currentThread().getName() + " 当前线程中断状态:" + Thread.currentThread().isInterrupted());
+        System.err.println(AppOfflineRunnable.class.getSimpleName() + "=====" + Thread.currentThread().getName() + " 当前线程中断状态:" + Thread.currentThread().isInterrupted());
+        // 下面逻辑主要是替换应用信息和删除临时容器中的应用，其他功能只是辅助
         if (!Thread.currentThread().isInterrupted()) {
             // 开始卸载旧应用的classloader和已加载的实例信息
             AppInfo appInfo1 = ProcessorManager.getOfflineApp(appId);
-            WeakReference<AppInfo> appInfoWeakReference = new WeakReference<>(appInfo1);
             // 检查是否为下线状态
             Boolean isOffline = appInfo1.isOffline;
-            System.err.println(Thread.currentThread().getName() + " 正式容器中旧应用在线状态 isOffline：" + isOffline);
+            System.err.println(AppOfflineRunnable.class.getSimpleName() + "=====" + Thread.currentThread().getName() + " 正式容器中旧应用在线状态 isOffline：" + isOffline);
             if (isOffline) {
                 // 替换正式容器中的appInfo
-                boolean isVerify = ProcessorManager.replaceAppInfo(appId);
-                System.err.println(Thread.currentThread().getName() + " 应用是否替换成功？" + isVerify);
+                boolean isReplaced = ProcessorManager.replaceAppInfo(appId);
+                System.err.println(AppOfflineRunnable.class.getSimpleName() + "=====" + Thread.currentThread().getName() + " 应用是否替换成功？" + isReplaced);
                 // 获取classloader
                 URLClassLoader classLoader = (URLClassLoader) appInfo1.getClass().getClassLoader();
+                WeakReference<AppInfo> appInfoWeakReference = new WeakReference<>(appInfo1);
                 WeakReference<URLClassLoader> classLoaderWeakReference = new WeakReference<>(classLoader);
-                if (isVerify) {
+                if (isReplaced) {
                     sleep(5 * 1000);
+                    // 清除临时容器中的新应用
                     ProcessorManager.removeTempMapApp(appId);
                 }
                 try {
@@ -64,10 +74,6 @@ public class AppOfflineRunnable implements Runnable {
                     appInfoWeakReference.clear();
                     classLoaderWeakReference.clear();
                     // 卸载classloader
-                    // 置为弱引用,等下一次垃圾回收
-                    if (appInfoWeakReference.get() == null && classLoaderWeakReference.get() == null) {
-                        System.err.println(Thread.currentThread().getName() + " appinfo和classloader 被回收");
-                    }
                     appInfoWeakReference = null;
                     classLoaderWeakReference = null;
                 }

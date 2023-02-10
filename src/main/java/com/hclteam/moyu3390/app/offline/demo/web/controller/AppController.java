@@ -58,7 +58,7 @@ public class AppController {
         String appId = s[0];
         String version = s[1];
         Object o = service.publishApp(appId, version);
-        return Result.success("");
+        return Result.success(o);
     }
 
     /**
@@ -72,12 +72,12 @@ public class AppController {
         String appId = s[0];
         String version = s[1];
         Object o = service2.publishApp(appId, version);
-        return Result.success("");
+        return Result.success(o);
     }
 
 
     /**
-     * 方式①，测试事务功能
+     * 方式②，测试事务功能
      * @param appId
      * @param processorId
      * @return
