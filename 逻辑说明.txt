@@ -18,6 +18,6 @@
 7、ClassScanner 工具类，用来扫描class文件，获取事务包下的所有业务class
 
 8、AppOfflineRunnable 是①方式的应用平滑下线处理线程对象。
-   AppOfflineRunnable 是②方式的应用平滑下线处理线程对象。
+   AppOfflineRunnableV2 是②方式的应用平滑下线处理线程对象。
 9、AppThreadCaller 是线程的调用类，维护下线线程的线程池。目前池内只会有一个活跃线程，多余的任务放置队列中。以后可以适当的调整线程数，暂时没有必要。
 
